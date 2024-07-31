@@ -1,21 +1,54 @@
 # Use the latest version of the Amazon Linux base image
-FROM amazonlinux:2 AS builder
+FROM amazonlinux:2
 
-# Update all installed packages to their latest versions and install necessary packages in one go
-RUN yum update -y && \
-    yum install -y unzip wget httpd amazon-linux-extras git && \
-    amazon-linux-extras enable php7.4 && \
-    yum clean metadata && \
-    yum install -y php php-common php-pear php-cgi php-curl php-mbstring php-gd php-mysqlnd php-gettext php-json php-xml php-fpm php-intl php-zip && \
-    wget https://repo.mysql.com/mysql80-community-release-el7-3.noarch.rpm && \
-    rpm --import https://repo.mysql.com/RPM-GPG-KEY-mysql-2023 && \
-    yum localinstall mysql80-community-release-el7-3.noarch.rpm -y && \
-    yum install mysql-community-server -y && \
-    yum clean all && \
-    rm -rf /var/cache/yum
+# Update all installed packages to thier latest versions
+RUN yum update -y 
+
+# Install the unzip package, which we will use it to extract the web files from the zip folder
+RUN yum install unzip -y
+
+# Install wget package, which we will use it to download files from the internet 
+RUN yum install -y wget
+
+# Install Apache
+RUN yum install -y httpd
+
+# Install PHP and various extensions
+RUN amazon-linux-extras enable php7.4 && \
+  yum clean metadata && \
+  yum install -y \
+    php \
+    php-common \
+    php-pear \
+    php-cgi \
+    php-curl \
+    php-mbstring \
+    php-gd \
+    php-mysqlnd \
+    php-gettext \
+    php-json \
+    php-xml \
+    php-fpm \
+    php-intl \
+    php-zip
+
+# Download the MySQL repository package
+RUN wget https://repo.mysql.com/mysql80-community-release-el7-3.noarch.rpm
+
+# Import the GPG key for the MySQL repository
+RUN rpm --import https://repo.mysql.com/RPM-GPG-KEY-mysql-2023
+
+# Install the MySQL repository package
+RUN yum localinstall mysql80-community-release-el7-3.noarch.rpm -y
+
+# Install the MySQL community server package
+RUN yum install mysql-community-server -y
 
 # Change directory to the html directory
 WORKDIR /var/www/html
+
+# Install Git
+RUN yum install -y git
 
 # Set the build argument directive
 ARG PERSONAL_ACCESS_TOKEN
@@ -41,44 +74,50 @@ ENV RDS_DB_NAME=$RDS_DB_NAME
 ENV RDS_DB_USERNAME=$RDS_DB_USERNAME
 ENV RDS_DB_PASSWORD=$RDS_DB_PASSWORD
 
-# Clone the GitHub repository and set up the application
-RUN git clone https://$PERSONAL_ACCESS_TOKEN@github.com/$GITHUB_USERNAME/$REPOSITORY_NAME.git && \
-    unzip $REPOSITORY_NAME/$WEB_FILE_ZIP -d $REPOSITORY_NAME/ && \
-    cp -av $REPOSITORY_NAME/$WEB_FILE_UNZIP/. /var/www/html && \
-    rm -rf $REPOSITORY_NAME && \
-    sed -i '/<Directory "\/var\/www\/html">/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/httpd/conf/httpd.conf && \
-    chmod -R 777 /var/www/html && \
-    chmod -R 777 storage/ && \
-    sed -i '/^APP_ENV=/ s/=.*$/=production/' .env && \
-    sed -i "/^APP_URL=/ s/=.*$/=https:\/\/$DOMAIN_NAME\//" .env && \
-    sed -i "/^DB_HOST=/ s/=.*$/=$RDS_ENDPOINT/" .env && \
-    sed -i "/^DB_DATABASE=/ s/=.*$/=$RDS_DB_NAME/" .env && \
-    sed -i "/^DB_USERNAME=/ s/=.*$/=$RDS_DB_USERNAME/" .env && \
-    sed -i "/^DB_PASSWORD=/ s/=.*$/=$RDS_DB_PASSWORD/" .env
+# Clone the GitHub repository
+RUN git clone https://$PERSONAL_ACCESS_TOKEN@github.com/$GITHUB_USERNAME/$REPOSITORY_NAME.git
 
-# Create a minimal image with only the necessary packages and files
-FROM amazonlinux:2
+# Unzip the zip folder containing the web files
+RUN unzip $REPOSITORY_NAME/$WEB_FILE_ZIP -d $REPOSITORY_NAME/
 
-# Install necessary runtime packages
-RUN yum update -y && \
-    yum install -y httpd php php-common php-curl php-mbstring php-mysqlnd php-json php-xml && \
-    wget https://repo.mysql.com/mysql80-community-release-el7-3.noarch.rpm && \
-    rpm --import https://repo.mysql.com/RPM-GPG-KEY-mysql-2023 && \
-    yum localinstall mysql80-community-release-el7-3.noarch.rpm -y && \
-    yum install mysql-community-server -y && \
-    yum clean all
+# Copy the web files into the HTML directory
+RUN cp -av $REPOSITORY_NAME/$WEB_FILE_UNZIP/. /var/www/html
 
-# Copy the necessary files from the builder stage
-COPY --from=builder /var/www/html /var/www/html
-COPY --from=builder /etc/httpd /etc/httpd
-COPY --from=builder /var/lib/mysql /var/lib/mysql
-COPY --from=builder /usr/lib64/mysql /usr/lib64/mysql
+# Remove the repository we cloned
+RUN rm -rf $REPOSITORY_NAME
 
-# Copy the AppServiceProvider.php file
-COPY AppServiceProvider.php /var/www/html/app/Providers/AppServiceProvider.php
+# Enable the mod_rewrite setting in the httpd.conf file
+RUN sed -i '/<Directory "\/var\/www\/html">/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/httpd/conf/httpd.conf
+
+# Give full access to the /var/www/html directory
+RUN chmod -R 777 /var/www/html
+
+# Give full access to the storage directory
+RUN chmod -R 777 storage/
+
+# Use the sed command to search the .env file for a line that starts with APP_ENV= and replace everything after the = character
+RUN sed -i '/^APP_ENV=/ s/=.*$/=production/' .env
+
+# Use the sed command to search the .env file for a line that starts with APP_URL= and replace everything after the = character
+RUN sed -i "/^APP_URL=/ s/=.*$/=https:\/\/$DOMAIN_NAME\//" .env
+
+# Use the sed command to search the .env file for a line that starts with DB_HOST= and replace everything after the = character
+RUN sed -i "/^DB_HOST=/ s/=.*$/=$RDS_ENDPOINT/" .env
+
+# Use the sed command to search the .env file for a line that starts with DB_DATABASE= and replace everything after the = character
+RUN sed -i "/^DB_DATABASE=/ s/=.*$/=$RDS_DB_NAME/" .env 
+
+# Use the sed command to search the .env file for a line that starts with DB_USERNAME= and replace everything after the = character
+RUN  sed -i "/^DB_USERNAME=/ s/=.*$/=$RDS_DB_USERNAME/" .env
+
+# Use the sed command to search the .env file for a line that starts with DB_PASSWORD= and replace everything after the = character
+RUN  sed -i "/^DB_PASSWORD=/ s/=.*$/=$RDS_DB_PASSWORD/" .env
+
+# Copy the file, AppServiceProvider.php from the host file system into the container at the path app/Providers/AppServiceProvider.php
+COPY AppServiceProvider.php app/Providers/AppServiceProvider.php
 
 # Expose the default Apache and MySQL ports
 EXPOSE 80 3306
 
 # Start Apache and MySQL
-CMD ["/bin/bash", "-c", "service mysqld start && /usr/sbin/httpd -D FOREGROUND"]
+ENTRYPOINT ["/usr/sbin/httpd", "-D", "FOREGROUND"]
