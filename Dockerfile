@@ -66,8 +66,7 @@ RUN yum update -y && \
     rpm --import https://repo.mysql.com/RPM-GPG-KEY-mysql-2023 && \
     yum localinstall mysql80-community-release-el7-3.noarch.rpm -y && \
     yum install mysql-community-server -y && \
-    yum clean all && \
-    rm -rf /var/cache/yum
+    yum clean all
 
 # Copy the necessary files from the builder stage
 COPY --from=builder /var/www/html /var/www/html
