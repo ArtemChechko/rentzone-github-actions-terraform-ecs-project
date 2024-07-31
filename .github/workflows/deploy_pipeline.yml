@@ -16,7 +16,7 @@ env:
   FLYWAY_VERSION: 10.17.0
 
 
-  
+
 jobs:
   # Configure AWS credentials 
   configure_aws_credentials:
@@ -336,7 +336,7 @@ jobs:
         run: |
           flyway -url=${{ env.FLYWAY_URL }} \
             -user=${{ env.FLYWAY_USER }} \
-            -password=${{ env.FLYWAY_USER }} \
+            -password=${{ env.FLYWAY_PASSWORD }} \
             -locations=${{ env.FLYWAY_LOCATION }} migrate
 
 
