@@ -59,19 +59,21 @@ RUN git clone https://$PERSONAL_ACCESS_TOKEN@github.com/$GITHUB_USERNAME/$REPOSI
 # Create a minimal image with only the necessary packages and files
 FROM amazonlinux:2
 
-# Copy only the necessary files from the builder stage
+# Install necessary runtime packages
+RUN yum update -y && \
+    yum install -y httpd php php-common php-curl php-mbstring php-mysqlnd php-json php-xml && \
+    wget https://repo.mysql.com/mysql80-community-release-el7-3.noarch.rpm && \
+    rpm --import https://repo.mysql.com/RPM-GPG-KEY-mysql-2023 && \
+    yum localinstall mysql80-community-release-el7-3.noarch.rpm -y && \
+    yum install mysql-community-server -y && \
+    yum clean all && \
+    rm -rf /var/cache/yum
+
+# Copy the necessary files from the builder stage
 COPY --from=builder /var/www/html /var/www/html
 COPY --from=builder /etc/httpd /etc/httpd
-COPY --from=builder /usr/lib64/mysql /usr/lib64/mysql
 COPY --from=builder /var/lib/mysql /var/lib/mysql
-COPY --from=builder /var/log/mysql /var/log/mysql
-COPY --from=builder /usr/lib64/php /usr/lib64/php
-COPY --from=builder /usr/share/php /usr/share/php
-COPY --from=builder /usr/sbin/httpd /usr/sbin/httpd
-COPY --from=builder /usr/bin/php /usr/bin/php
-COPY --from=builder /usr/bin/mysql /usr/bin/mysql
-COPY --from=builder /usr/bin/mysqld_safe /usr/bin/mysqld_safe
-COPY --from=builder /etc/php.ini /etc/php.ini
+COPY --from=builder /usr/lib64/mysql /usr/lib64/mysql
 
 # Copy the AppServiceProvider.php file
 COPY AppServiceProvider.php /var/www/html/app/Providers/AppServiceProvider.php
@@ -80,6 +82,4 @@ COPY AppServiceProvider.php /var/www/html/app/Providers/AppServiceProvider.php
 EXPOSE 80 3306
 
 # Start Apache and MySQL
-ENTRYPOINT ["/usr/sbin/httpd", "-D", "FOREGROUND"]
-
-
+CMD ["/bin/bash", "-c", "service mysqld start && /usr/sbin/httpd -D FOREGROUND"]
