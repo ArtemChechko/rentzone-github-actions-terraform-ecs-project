@@ -104,9 +104,9 @@ This project demonstrates how to deploy a dynamic web application on AWS using E
    Use the `aws-actions/amazon-ecr-login@v1` action to create and login to ECR.
 
 5. **Set Up a Self-Hosted Runner**
-   1. Launch an Amazon Linux 2023 EC2 instance.
-   2. SSH into the instance and install Docker and Git.
-   3. Create an AMI from this instance and terminate it.
+   - Launch an Amazon Linux 2023 EC2 instance.
+   - SSH into the instance and install Docker and Git.
+   - Create an AMI from this instance and terminate it.
 
 6. **Start Self-Hosted Runner**  
    Use the `machulav/ec2-github-runner` action to start the runner.
